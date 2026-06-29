@@ -61,6 +61,13 @@ export const BALANCE = {
     lowThreshold: 35,
     criticalThreshold: 15
   },
+  waves: {
+    maxWaves: 3,
+    extraPeasantsPerWave: 3,
+    extraGuardsPerWave: 1,
+    extraBodiesTargetPerWave: 4,
+    stabilityReward: 8
+  },
   pit: {
     hp: 260,
     startSouls: 0,

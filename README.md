@@ -10,7 +10,7 @@ Le but n'est pas de copier un jeu existant : GOETIA garde son twist central, la 
 
 ## État du prototype
 
-Cette v0.3 contient déjà :
+Cette v0.4 contient déjà :
 
 - un menu principal avec pitch, objectif et lancement rapide ;
 - une scène 2D latérale 960x540 ;
@@ -18,6 +18,9 @@ Cette v0.3 contient déjà :
 - une pause avec `P` ou `Echap` ;
 - un retour menu avec `M` ;
 - un panneau d'objectif dynamique ;
+- une boucle de **3 vagues** avec difficulté croissante ;
+- un écran de choix de sceau entre les vagues ;
+- trois upgrades de départ : Murmur, Bifrons, Leraje ;
 - une main contrôlée à la souris, avec ombre et feedback de saisie ;
 - grab / throw sur villageois et cadavres ;
 - dégâts d'impact contre le sol et les bâtiments ;
@@ -48,6 +51,7 @@ Cette v0.3 contient déjà :
 | Marquer un cadavre extrait comme prioritaire | `Shift` + clic gauche |
 | Créer un porteur de Bifrons | `1` |
 | Créer un archer de Leraje | `2` |
+| Choisir un upgrade entre les vagues | `1`, `2` ou `3` |
 | Aide en jeu | `H` |
 | Pause / reprise | `P` ou `Echap` |
 | Retour menu | `M` |
@@ -63,6 +67,14 @@ La stabilité représente l'intégrité des sceaux autour de la fosse.
 - Chaque corps ramené à la fosse restaure un peu la stabilité.
 - Détruire/profaner un bâtiment restaure de la stabilité.
 - Si la stabilité tombe à zéro, la partie est perdue.
+
+## Upgrades de vague
+
+Après une vague réussie, le joueur choisit un sceau :
+
+- `1 — Murmur` : réduit le coût de stabilité des extractions.
+- `2 — Bifrons` : ajoute un porteur au début des vagues et réduit son coût de stabilité.
+- `3 — Leraje` : ajoute un archer au début des vagues, renforce les tirs et réduit son coût de stabilité.
 
 ## Installation locale
 
@@ -118,8 +130,8 @@ goetia_v2/
 
 ## Prochaine étape conseillée
 
-Avant d'ajouter du lore ou des assets, tester uniquement ceci :
+Tester maintenant la boucle :
 
-> Est-ce que la boucle `attraper → tuer → extirper âme → prioriser un corps → porteur ramène corps → fosse produit` est fun pendant 5 minutes ?
+> vague 1 → objectif → choix de sceau → vague 2 → choix de sceau → vague 3 → victoire finale.
 
-Si oui, on peut ajouter les upgrades, les autres sceaux, les sons et une vraie direction artistique.
+Ensuite on pourra ajouter des sons, une vraie direction artistique et des démons plus dangereux.

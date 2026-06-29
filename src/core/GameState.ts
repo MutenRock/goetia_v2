@@ -1,6 +1,8 @@
 import { BALANCE } from './balance';
 import type { Cost, Resources } from './types';
 
+export type UpgradeId = 'murmur' | 'bifrons' | 'leraje';
+
 export class GameState {
   public resources: Resources = {
     souls: BALANCE.pit.startSouls,
@@ -13,8 +15,14 @@ export class GameState {
     maxCombo: 0
   };
 
+  public upgrades: Record<UpgradeId, number> = {
+    murmur: 0,
+    bifrons: 0,
+    leraje: 0
+  };
+
   public wave = 1;
-  public status: 'playing' | 'victory' | 'defeat' = 'playing';
+  public status: 'playing' | 'upgrade' | 'victory' | 'defeat' = 'playing';
   private comboExpiresAt = 0;
 
   canPay(cost: Cost): boolean {
@@ -43,6 +51,18 @@ export class GameState {
       Math.max(BALANCE.stability.min, Math.min(BALANCE.stability.max, this.resources.stability + delta))
     );
     return this.resources.stability;
+  }
+
+  applyUpgrade(id: UpgradeId): void {
+    this.upgrades[id] += 1;
+  }
+
+  advanceWave(): void {
+    this.wave += 1;
+    this.status = 'playing';
+    this.resources.processed = 0;
+    this.resources.purified = 0;
+    this.resources.combo = 0;
   }
 
   tick(timeMs: number): void {
