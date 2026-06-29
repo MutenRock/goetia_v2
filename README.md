@@ -26,8 +26,10 @@ Cette v0.2 contient déjà :
 - porteurs de Bifrons qui récupèrent les cadavres extraits et respectent les priorités ;
 - fosse qui stocke les corps ;
 - archers de Leraje produits depuis la fosse ;
-- gardes qui attaquent la fosse et les porteurs ;
-- chapelle qui purifie les cadavres ;
+- maisons qui font revenir des villageois tant qu'elles tiennent ;
+- caserne qui appelle des gardes tant qu'elle tient ;
+- chapelle avec aura visible qui purifie les cadavres proches ;
+- scoring arcade sur impacts, extractions, corps stockés, invocations et bâtiments détruits ;
 - score arcade, combo temporaire et score final ;
 - conditions simples de victoire/défaite.
 
