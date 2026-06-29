@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { WORLD, DEPTH } from '../core/constants';
+import { openBugReportMail } from '../core/bugReport';
+import { GAME_VERSION } from '../core/version';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -38,18 +40,18 @@ export class MenuScene extends Phaser.Scene {
       color: '#efe9d4'
     }).setOrigin(0.5).setDepth(DEPTH.ui);
 
-    this.add.text(WORLD.width / 2, 124, 'Mortis Prototype — v0.2', {
+    this.add.text(WORLD.width / 2, 124, `Mortis Prototype — ${GAME_VERSION}`, {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#a266c7'
     }).setOrigin(0.5).setDepth(DEPTH.ui);
 
-    const card = this.add.rectangle(WORLD.width / 2, 276, 720, 260, 0x160d1f, 0.88)
+    const card = this.add.rectangle(WORLD.width / 2, 272, 740, 280, 0x160d1f, 0.88)
       .setStrokeStyle(2, 0xa266c7, 0.85)
       .setDepth(DEPTH.ui - 1);
 
     const text = [
-      'Tu controles une main de conjurateur au-dessus d un village.',
+      'Version playtest : objectif = finir 3 vagues et remonter les bugs.',
       '',
       'But : nourrir la fosse sans laisser la chapelle purifier les corps.',
       '',
@@ -57,28 +59,49 @@ export class MenuScene extends Phaser.Scene {
       '2. Extirpe les ames avec Murmur.',
       '3. Priorise les corps importants.',
       '4. Les porteurs de Bifrons les ramenent a la fosse.',
-      '5. Depense corps + ames pour contraindre de nouveaux serviteurs.',
+      '5. Entre deux vagues, choisis un sceau pour ameliorer la run.',
       '',
-      'ENTREE / CLIC : commencer     H : aide en jeu'
+      'ENTREE / ESPACE : commencer     B : signaler un bug'
     ].join('\n');
 
-    this.add.text(card.x - 330, card.y - 112, text, {
+    this.add.text(card.x - 340, card.y - 124, text, {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#efe9d4',
       lineSpacing: 5
     }).setDepth(DEPTH.ui);
 
-    this.add.text(WORLD.width / 2, 470, 'GOETIA garde son twist : ame et corps sont deux ressources separees.', {
+    this.createMenuButton(WORLD.width / 2 - 170, 446, '▶ JOUER', () => this.scene.start('GameScene'), '#9ddf7c');
+    this.createMenuButton(WORLD.width / 2 + 170, 446, '✉ BUG REPORT', () => this.reportBug(), '#f0c96a');
+
+    this.add.text(WORLD.width / 2, 500, 'Le bouton bug ouvre ton client mail avec un rapport prérempli vers pierreh@sterenna.fr.', {
       fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#9ddf7c'
+      fontSize: '12px',
+      color: '#8f86a0'
     }).setOrigin(0.5).setDepth(DEPTH.ui);
+  }
+
+  private createMenuButton(x: number, y: number, label: string, onClick: () => void, color: string): void {
+    const text = this.add.text(x, y, label, {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color,
+      backgroundColor: '#100916cc',
+      padding: { left: 16, right: 16, top: 9, bottom: 9 }
+    }).setOrigin(0.5).setDepth(DEPTH.ui).setInteractive({ useHandCursor: true });
+
+    text.on('pointerover', () => text.setScale(1.05));
+    text.on('pointerout', () => text.setScale(1));
+    text.on('pointerdown', () => onClick());
   }
 
   private createInput(): void {
     this.input.keyboard?.on('keydown-ENTER', () => this.scene.start('GameScene'));
     this.input.keyboard?.on('keydown-SPACE', () => this.scene.start('GameScene'));
-    this.input.once('pointerdown', () => this.scene.start('GameScene'));
+    this.input.keyboard?.on('keydown-B', () => this.reportBug());
+  }
+
+  private reportBug(): void {
+    openBugReportMail({ scene: 'MenuScene', status: 'main-menu' });
   }
 }
