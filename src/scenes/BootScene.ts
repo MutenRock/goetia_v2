@@ -7,7 +7,7 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.createGeneratedTextures();
-    this.scene.start('GameScene');
+    this.scene.start('MenuScene');
   }
 
   private createGeneratedTextures(): void {

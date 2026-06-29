@@ -30,8 +30,14 @@ export class GameScene extends Phaser.Scene {
   private archers: Archer[] = [];
 
   private hud!: Phaser.GameObjects.Text;
+  private objectiveText!: Phaser.GameObjects.Text;
   private centerText!: Phaser.GameObjects.Text;
+  private pauseOverlay!: Phaser.GameObjects.Container;
+  private helpOverlay!: Phaser.GameObjects.Container;
   private pointerWasRightDown = false;
+  private shiftKey?: Phaser.Input.Keyboard.Key;
+  private isPaused = false;
+  private helpVisible = false;
 
   constructor() {
     super('GameScene');
@@ -43,11 +49,18 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, deltaMs: number): void {
     if (this.state.status !== 'playing') return;
-    const deltaSeconds = deltaMs / 1000;
+    this.state.tick(time);
     const pointer = this.input.activePointer;
     this.hand.setPosition(pointer.x, pointer.y);
-    this.grab.updatePointer(pointer.x, pointer.y);
     this.hand.setClosed(this.grab.held !== null);
+
+    if (this.isPaused) {
+      this.updateHud();
+      return;
+    }
+
+    const deltaSeconds = deltaMs / 1000;
+    this.grab.updatePointer(pointer.x, pointer.y);
     this.soulExtraction.update(deltaMs);
 
     this.updateLiving(deltaMs);
@@ -66,6 +79,8 @@ export class GameScene extends Phaser.Scene {
     this.children.removeAll();
     this.physics.world.colliders.destroy();
     this.state = new GameState();
+    this.isPaused = false;
+    this.helpVisible = false;
     this.living = [];
     this.corpses = [];
     this.buildings = [];
@@ -79,6 +94,8 @@ export class GameScene extends Phaser.Scene {
     this.createLevel();
     this.createInput();
     this.createHud();
+    this.createOverlays();
+    this.flashCenter('H : aide   |   P : pause   |   M : menu');
   }
 
   private createWorldArt(): void {
@@ -114,24 +131,50 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createInput(): void {
+    this.shiftKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.state.status !== 'playing') return;
+      if (this.state.status !== 'playing' || this.isPaused) return;
       if (pointer.leftButtonDown()) {
-        this.grab.tryGrab(pointer, this.living, this.corpses);
+        if (this.shiftKey?.isDown) {
+          this.togglePriorityAt(pointer.x, pointer.y);
+          return;
+        }
+        const grabbed = this.grab.tryGrab(pointer, this.living, this.corpses);
+        if (grabbed) {
+          this.hand.pulseGrab();
+          this.flashText('saisi', grabbed.x, grabbed.y - 34, '#f0c96a');
+        }
       }
     });
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.state.status !== 'playing' || this.isPaused) return;
       if (pointer.button === 0) {
         const release = this.grab.release();
-        if (release) this.cameras.main.shake(60, 0.003);
+        if (release) {
+          const throwSpeed = Phaser.Math.Distance.Between(0, 0, release.vx, release.vy);
+          this.cameras.main.shake(60, 0.003);
+          if (throwSpeed > 540) {
+            this.addScoreAt(5, release.target.x, release.target.y - 34, 'jet violent');
+          }
+        }
       }
     });
 
     this.input.keyboard?.on('keydown-R', () => this.resetScene());
-    this.input.keyboard?.on('keydown-ONE', () => this.tryCraftHauler());
-    this.input.keyboard?.on('keydown-TWO', () => this.tryCraftArcher());
+    this.input.keyboard?.on('keydown-M', () => this.scene.start('MenuScene'));
+    this.input.keyboard?.on('keydown-H', () => this.toggleHelp());
+    this.input.keyboard?.on('keydown-P', () => this.togglePause());
+    this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
+    this.input.keyboard?.on('keydown-ONE', () => {
+      if (!this.isPaused) this.tryCraftHauler();
+    });
+    this.input.keyboard?.on('keydown-TWO', () => {
+      if (!this.isPaused) this.tryCraftArcher();
+    });
     this.input.keyboard?.on('keydown-E', () => {
+      if (this.isPaused) return;
       const p = this.input.activePointer;
       this.extractAt(p.x, p.y);
     });
@@ -140,11 +183,20 @@ export class GameScene extends Phaser.Scene {
   private createHud(): void {
     this.hud = this.add.text(14, 12, '', {
       fontFamily: 'monospace',
-      fontSize: '14px',
+      fontSize: '13px',
       color: '#efe9d4',
       backgroundColor: '#100916cc',
       padding: { left: 8, right: 8, top: 6, bottom: 6 }
     }).setDepth(DEPTH.ui);
+
+    this.objectiveText = this.add.text(WORLD.width - 14, 12, '', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#efe9d4',
+      backgroundColor: '#100916cc',
+      align: 'right',
+      padding: { left: 8, right: 8, top: 6, bottom: 6 }
+    }).setOrigin(1, 0).setDepth(DEPTH.ui);
 
     this.centerText = this.add.text(WORLD.width / 2, 72, '', {
       fontFamily: 'monospace',
@@ -156,15 +208,79 @@ export class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  private createOverlays(): void {
+    this.pauseOverlay = this.createModal([
+      'PAUSE',
+      '',
+      'P / Echap : reprendre',
+      'H : aide',
+      'R : recommencer',
+      'M : retour menu'
+    ], '#f0c96a');
+    this.pauseOverlay.setVisible(false);
+
+    this.helpOverlay = this.createModal([
+      'COMMENT JOUER',
+      '',
+      'La main cree le chaos. La fosse transforme le chaos en armee.',
+      '',
+      'Clic gauche maintenu : saisir un vivant ou un cadavre.',
+      'Relacher avec elan : jeter. Les impacts forts tuent et abiment les batiments.',
+      'Clic droit / E : extirper l ame d un cadavre lumineux.',
+      'Shift + clic : prioriser un cadavre extrait pour les porteurs.',
+      '1 : creer un porteur de Bifrons avec 1 ame + 1 corps.',
+      '2 : creer un archer de Leraje avec 2 ames + 1 corps.',
+      '',
+      'Objectif : detruire/profaner la chapelle et nourrir la fosse.',
+      'Attention : la chapelle purifie les cadavres trop proches.',
+      '',
+      'H : fermer cette aide'
+    ], '#9ddf7c');
+    this.helpOverlay.setVisible(false);
+  }
+
+  private createModal(lines: string[], accent: string): Phaser.GameObjects.Container {
+    const panel = this.add.container(WORLD.width / 2, WORLD.height / 2).setDepth(DEPTH.ui + 20);
+    const bg = this.add.rectangle(0, 0, 760, 390, 0x100916, 0.94).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(accent).color, 0.9);
+    const text = this.add.text(-340, -170, lines.join('\n'), {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#efe9d4',
+      lineSpacing: 5
+    });
+    panel.add([bg, text]);
+    return panel;
+  }
+
   private updateHud(): void {
     const r = this.state.resources;
+    const comboText = r.combo > 0 ? `   Combo: x${r.combo}` : '';
     this.hud.setText([
       'GOETIA v2 / Mortis Prototype',
-      'Clic gauche : attraper / jeter   |   Clic droit ou E : extirper âme',
-      '1 : porteur Bifrons (1 âme + 1 corps)   |   2 : archer Leraje (2 âmes + 1 corps)',
+      'H : aide   P/Echap : pause   M : menu   R : restart',
+      'Clic gauche : attraper/jeter   Shift+clic : priorité cadavre',
+      'Clic droit ou E : extirper âme   |   1 : Bifrons   |   2 : Leraje',
+      `Score: ${r.score}${comboText}   Meilleur combo: x${r.maxCombo}`,
       `Âmes: ${r.souls}   Corps: ${r.bodies}   Traités: ${r.processed}   Purifiés: ${r.purified}   Stabilité: ${r.stability}`,
       `Fosse HP: ${this.pit?.hp ?? 0}   Porteurs: ${this.haulers.filter((h) => h.active).length}   Archers: ${this.archers.filter((a) => a.active).length}`
     ]);
+
+    this.objectiveText.setText(this.getObjectiveText());
+  }
+
+  private getObjectiveText(): string {
+    const chapelAlive = this.buildings.some((building) => building.kind === 'chapel' && building.active);
+    const barracksAlive = this.buildings.some((building) => building.kind === 'barracks' && building.active);
+    const processedOk = this.state.resources.processed >= LEVELS[0].victoryProcessedBodies;
+    return [
+      'OBJECTIF',
+      `${chapelAlive ? '[ ]' : '[x]'} Profaner la chapelle`,
+      `${processedOk ? '[x]' : '[ ]'} Nourrir la fosse ${this.state.resources.processed}/${LEVELS[0].victoryProcessedBodies}`,
+      `${barracksAlive ? '[ ]' : '[x]'} Briser la caserne`,
+      `${this.pit.hp > 0 ? '[x]' : '[ ]'} Protéger la fosse`,
+      '',
+      'Perte : 12 corps purifiés'
+    ].join('\n');
   }
 
   private updateLiving(deltaMs: number): void {
@@ -203,7 +319,7 @@ export class GameScene extends Phaser.Scene {
       if (deposited) {
         this.state.resources.bodies += 1;
         this.state.resources.processed += 1;
-        this.flashText('+1 corps stocké', this.pit.x, this.pit.y - 90);
+        this.addScoreAt(15, this.pit.x, this.pit.y - 90, '+1 corps stocké');
       }
       if (hauler.y > WORLD.groundY - 18) {
         hauler.setY(WORLD.groundY - 18);
@@ -249,6 +365,7 @@ export class GameScene extends Phaser.Scene {
         if (!building.active) continue;
         if (Phaser.Geom.Rectangle.Contains(building.bounds, unit.x, unit.y)) {
           building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
+          this.addScoreAt(20, building.x, building.y - building.bounds.height / 2, 'impact bâtiment');
           this.killLiving(unit, speed / 60);
           this.cameras.main.shake(90, 0.006);
           break;
@@ -282,7 +399,38 @@ export class GameScene extends Phaser.Scene {
     if (!corpse) return;
     this.state.resources.souls += corpse.bodyType === 'guard' ? 2 : 1;
     this.hand.pulseExtraction();
-    this.flashText(corpse.bodyType === 'guard' ? '+2 âmes' : '+1 âme', corpse.x, corpse.y - 42, '#9ddf7c');
+    this.addScoreAt(corpse.bodyType === 'guard' ? 20 : 10, corpse.x, corpse.y - 42, corpse.bodyType === 'guard' ? '+2 âmes' : '+1 âme');
+  }
+
+  private togglePriorityAt(x: number, y: number): void {
+    const candidates = this.corpses
+      .filter((corpse) => corpse.active && corpse.soulExtracted && !corpse.carried)
+      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.x, a.y) - Phaser.Math.Distance.Between(x, y, b.x, b.y));
+    const corpse = candidates[0];
+    if (!corpse || Phaser.Math.Distance.Between(x, y, corpse.x, corpse.y) > 56) {
+      this.flashCenter('Aucun cadavre extrait à prioriser');
+      return;
+    }
+    corpse.setPriority(!corpse.priority);
+    this.flashText(corpse.priority ? 'priorité' : 'priorité retirée', corpse.x, corpse.y - 32, '#f0c96a');
+  }
+
+  private togglePause(): void {
+    if (this.state.status !== 'playing') return;
+    if (this.helpVisible) {
+      this.toggleHelp();
+      return;
+    }
+    this.isPaused = !this.isPaused;
+    this.pauseOverlay.setVisible(this.isPaused);
+  }
+
+  private toggleHelp(): void {
+    if (this.state.status !== 'playing') return;
+    this.helpVisible = !this.helpVisible;
+    this.isPaused = this.helpVisible;
+    this.helpOverlay.setVisible(this.helpVisible);
+    this.pauseOverlay.setVisible(false);
   }
 
   private tryCraftHauler(): void {
@@ -291,6 +439,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.spawnHauler(this.pit.x - 52, WORLD.groundY - 18);
+    this.addScoreAt(25, this.pit.x - 52, WORLD.groundY - 70, 'Sceau de Bifrons');
     this.flashCenter('Sceau de Bifrons : porteur contraint');
   }
 
@@ -301,6 +450,7 @@ export class GameScene extends Phaser.Scene {
     }
     const archer = new Archer(this, this.pit.x - 112 - this.archers.length * 16, WORLD.groundY - 20);
     this.archers.push(archer);
+    this.addScoreAt(35, archer.x, archer.y - 42, 'Sceau de Leraje');
     this.flashCenter('Sceau de Leraje : archer lié');
   }
 
@@ -322,7 +472,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnCorpse(unit.x, unit.y, bodyType);
     unit.destroy();
     this.living = this.living.filter((other) => other !== unit);
-    this.flashText('mort', unit.x, unit.y - 28, '#d57a66');
+    this.addScoreAt(unit.kind === 'guard' ? 25 : 10, unit.x, unit.y - 28, 'mort');
     if (impulse > 7) this.cameras.main.shake(70, 0.004);
   }
 
@@ -356,8 +506,15 @@ export class GameScene extends Phaser.Scene {
 
   private endGame(status: 'victory' | 'defeat', message: string): void {
     this.state.status = status;
-    this.centerText.setText(`${message}\nR pour recommencer`);
+    this.pauseOverlay?.setVisible(false);
+    this.helpOverlay?.setVisible(false);
+    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nR pour recommencer   |   M pour menu`);
     this.centerText.setColor(status === 'victory' ? '#9ddf7c' : '#d57a66');
+  }
+
+  private addScoreAt(base: number, x: number, y: number, label: string): void {
+    const gained = this.state.addScore(base, this.time.now);
+    this.flashText(`${label}  +${gained}`, x, y, '#f0c96a');
   }
 
   private flashText(text: string, x: number, y: number, color = '#efe9d4'): void {
@@ -378,7 +535,7 @@ export class GameScene extends Phaser.Scene {
   private flashCenter(text: string): void {
     this.centerText.setText(text);
     this.time.delayedCall(1200, () => {
-      if (this.state.status === 'playing') this.centerText.setText('');
+      if (this.state.status === 'playing' && !this.isPaused) this.centerText.setText('');
     });
   }
 }

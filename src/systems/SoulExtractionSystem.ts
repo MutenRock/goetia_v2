@@ -16,8 +16,7 @@ export class SoulExtractionSystem {
     const corpse = candidates[0];
     if (!corpse) return null;
 
-    corpse.soulExtracted = true;
-    corpse.setTint(0x99ffcc);
+    corpse.markSoulExtracted();
     this.cooldown = BALANCE.hand.extractCooldownMs;
 
     const soul = scene.add.circle(corpse.x, corpse.y - 24, 9, 0x9ddf7c, 0.95).setDepth(60);
