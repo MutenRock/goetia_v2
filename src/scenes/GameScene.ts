@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { WORLD, DEPTH } from '../core/constants';
 import { BALANCE } from '../core/balance';
 import { GameState, type UpgradeId } from '../core/GameState';
+import { GAME_VERSION } from '../core/version';
+import { openBugReportMail } from '../core/bugReport';
 import { LEVELS } from '../data/levels';
 import { Hand } from '../entities/Hand';
 import { LivingUnit } from '../entities/LivingUnit';
@@ -80,7 +82,7 @@ export class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 
-  private resetScene(preserveState = false, introText = 'H : aide   |   P : pause   |   M : menu'): void {
+  private resetScene(preserveState = false, introText = 'H : aide   |   P : pause   |   M : menu   |   B : bug report'): void {
     this.children.removeAll();
     this.physics.world.colliders.destroy();
     if (!preserveState) {
@@ -191,6 +193,7 @@ export class GameScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-R', () => this.resetScene(false));
     this.input.keyboard?.on('keydown-M', () => this.scene.start('MenuScene'));
+    this.input.keyboard?.on('keydown-B', () => this.reportBug());
     this.input.keyboard?.on('keydown-H', () => this.toggleHelp());
     this.input.keyboard?.on('keydown-P', () => this.togglePause());
     this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
@@ -252,6 +255,7 @@ export class GameScene extends Phaser.Scene {
       '',
       'P / Echap : reprendre',
       'H : aide',
+      'B : signaler un bug',
       'R : recommencer',
       'M : retour menu'
     ], '#f0c96a');
@@ -273,6 +277,8 @@ export class GameScene extends Phaser.Scene {
       'Murmur reduit le cout de stabilite des extractions.',
       'Bifrons ajoute un porteur au debut des vagues.',
       'Leraje ajoute un archer au debut des vagues et renforce ses tirs.',
+      '',
+      'B : ouvre un mail de bug report pre-rempli.',
       '',
       'Objectif : detruire/profaner la chapelle et nourrir la fosse.',
       '',
@@ -298,8 +304,8 @@ export class GameScene extends Phaser.Scene {
     const r = this.state.resources;
     const comboText = r.combo > 0 ? `   Combo: x${r.combo}` : '';
     this.hud.setText([
-      `GOETIA v2 / Vague ${this.state.wave}/${BALANCE.waves.maxWaves}`,
-      'H : aide   P/Echap : pause   M : menu   R : restart',
+      `GOETIA ${GAME_VERSION} / Vague ${this.state.wave}/${BALANCE.waves.maxWaves}`,
+      'H : aide   P/Echap : pause   M : menu   B : bug report   R : restart',
       'Clic gauche : attraper/jeter   Shift+clic : priorité cadavre',
       'Clic droit ou E : extirper âme   |   1 : Bifrons   |   2 : Leraje',
       `Score: ${r.score}${comboText}   Meilleur combo: x${r.maxCombo}`,
@@ -657,7 +663,7 @@ export class GameScene extends Phaser.Scene {
       `3 — Leraje niv.${this.state.upgrades.leraje + 1}`,
       '    +1 archer au debut des vagues, tirs plus puissants et cout reduit.',
       '',
-      'Appuie sur 1, 2 ou 3.'
+      'B : signaler un bug / Appuie sur 1, 2 ou 3.'
     ], '#f0c96a');
   }
 
@@ -670,12 +676,35 @@ export class GameScene extends Phaser.Scene {
     this.resetScene(true, `Sceau de ${label} renforcé. Vague ${this.state.wave}. +${BALANCE.waves.stabilityReward} stabilité.`);
   }
 
+  private reportBug(): void {
+    const resources = this.state.resources;
+    openBugReportMail({
+      scene: 'GameScene',
+      status: this.state.status,
+      wave: this.state.wave,
+      score: resources.score,
+      souls: resources.souls,
+      bodies: resources.bodies,
+      stability: resources.stability,
+      processed: resources.processed,
+      purified: resources.purified,
+      murmur: this.state.upgrades.murmur,
+      bifrons: this.state.upgrades.bifrons,
+      leraje: this.state.upgrades.leraje,
+      living: this.living.filter((unit) => unit.active).length,
+      corpses: this.corpses.filter((corpse) => corpse.active).length,
+      haulers: this.haulers.filter((hauler) => hauler.active).length,
+      archers: this.archers.filter((archer) => archer.active).length,
+      pitHp: this.pit?.hp
+    });
+  }
+
   private endGame(status: 'victory' | 'defeat', message: string): void {
     this.state.status = status;
     this.pauseOverlay?.setVisible(false);
     this.helpOverlay?.setVisible(false);
     this.upgradeOverlay?.setVisible(false);
-    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nStabilité finale : ${this.state.resources.stability}\nR pour recommencer   |   M pour menu`);
+    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nStabilité finale : ${this.state.resources.stability}\nB pour signaler un bug\nR pour recommencer   |   M pour menu`);
     this.centerText.setColor(status === 'victory' ? '#9ddf7c' : '#d57a66');
   }
 

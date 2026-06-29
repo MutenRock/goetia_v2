@@ -10,9 +10,12 @@ Le but n'est pas de copier un jeu existant : GOETIA garde son twist central, la 
 
 ## État du prototype
 
-Cette v0.4 contient déjà :
+Cette v0.5 contient déjà :
 
-- un menu principal avec pitch, objectif et lancement rapide ;
+- un menu principal playtest avec lancement rapide ;
+- un bouton **bug report** dans le menu ;
+- un raccourci `B` pour préparer un mail de bug report vers `pierreh@sterenna.fr` ;
+- un rapport de bug prérempli avec version, URL, navigateur, résolution, date et contexte de jeu ;
 - une scène 2D latérale 960x540 ;
 - une aide en jeu consultable avec `H` ;
 - une pause avec `P` ou `Echap` ;
@@ -43,7 +46,7 @@ Cette v0.4 contient déjà :
 
 | Action | Contrôle |
 |---|---|
-| Commencer depuis le menu | `Entrée`, `Espace` ou clic |
+| Commencer depuis le menu | `Entrée`, `Espace` ou bouton `Jouer` |
 | Déplacer la main | Souris |
 | Attraper | Clic gauche maintenu |
 | Jeter | Relâcher clic gauche avec mouvement |
@@ -52,10 +55,30 @@ Cette v0.4 contient déjà :
 | Créer un porteur de Bifrons | `1` |
 | Créer un archer de Leraje | `2` |
 | Choisir un upgrade entre les vagues | `1`, `2` ou `3` |
+| Signaler un bug | `B` ou bouton `Bug Report` dans le menu |
 | Aide en jeu | `H` |
 | Pause / reprise | `P` ou `Echap` |
 | Retour menu | `M` |
 | Restart | `R` |
+
+## Bug report playtest
+
+Le jeu est statique : il ne peut pas envoyer un email silencieusement sans backend SMTP/API.
+
+La v0.5 utilise donc un lien `mailto:` :
+
+- `B` ouvre le client mail du testeur ;
+- le destinataire est `pierreh@sterenna.fr` ;
+- le sujet est prérempli ;
+- le corps du mail contient les champs à remplir + contexte automatique.
+
+Pour tester le bug report :
+
+1. lancer le jeu ;
+2. appuyer sur `B` depuis le menu ou pendant une partie ;
+3. vérifier que le mail s'ouvre avec le contexte prérempli ;
+4. compléter description / étapes / résultat attendu ;
+5. envoyer.
 
 ## Logique de stabilité
 
@@ -98,28 +121,14 @@ npm run preview
 
 Le dossier `dist/` est statique et peut être servi par Apache/Nginx/OVH.
 
-## Création du repo GitHub
-
-Depuis le dossier parent :
-
-```bash
-gh repo create MutenRock/goetia_v2 --public --description "GOETIA v2 — arcade web prototype for necromantic logistics" --source ./goetia_v2 --remote origin --push
-```
-
-Si tu préfères en privé :
-
-```bash
-gh repo create MutenRock/goetia_v2 --private --description "GOETIA v2 — arcade web prototype for necromantic logistics" --source ./goetia_v2 --remote origin --push
-```
-
 ## Structure
 
 ```txt
 goetia_v2/
-├─ docs/                  # GDD, roadmap, lore mapping
+├─ docs/                  # GDD, roadmap, lore mapping, playtest
 ├─ public/assets/          # futur sprites/audio/sigils
 ├─ src/
-│  ├─ core/                # state, types, balance
+│  ├─ core/                # state, types, balance, version, bug report
 │  ├─ data/                # demons, levels
 │  ├─ entities/            # hand, units, corpse, pit, buildings
 │  ├─ scenes/              # BootScene, MenuScene, GameScene
@@ -132,6 +141,6 @@ goetia_v2/
 
 Tester maintenant la boucle :
 
-> vague 1 → objectif → choix de sceau → vague 2 → choix de sceau → vague 3 → victoire finale.
+> menu → bug report → vague 1 → objectif → choix de sceau → vague 2 → choix de sceau → vague 3 → victoire finale → bug report.
 
 Ensuite on pourra ajouter des sons, une vraie direction artistique et des démons plus dangereux.
