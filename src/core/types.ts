@@ -9,6 +9,9 @@ export interface Resources {
   stability: number;
   purified: number;
   processed: number;
+  score: number;
+  combo: number;
+  maxCombo: number;
 }
 
 export interface Cost {
