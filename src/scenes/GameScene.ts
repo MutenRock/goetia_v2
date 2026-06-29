@@ -32,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: Phaser.GameObjects.Text;
   private centerText!: Phaser.GameObjects.Text;
   private pointerWasRightDown = false;
+  private shiftKey?: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('GameScene');
@@ -43,6 +44,7 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, deltaMs: number): void {
     if (this.state.status !== 'playing') return;
+    this.state.tick(time);
     const deltaSeconds = deltaMs / 1000;
     const pointer = this.input.activePointer;
     this.hand.setPosition(pointer.x, pointer.y);
@@ -114,17 +116,33 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createInput(): void {
+    this.shiftKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.state.status !== 'playing') return;
       if (pointer.leftButtonDown()) {
-        this.grab.tryGrab(pointer, this.living, this.corpses);
+        if (this.shiftKey?.isDown) {
+          this.togglePriorityAt(pointer.x, pointer.y);
+          return;
+        }
+        const grabbed = this.grab.tryGrab(pointer, this.living, this.corpses);
+        if (grabbed) {
+          this.hand.pulseGrab();
+          this.flashText('saisi', grabbed.x, grabbed.y - 34, '#f0c96a');
+        }
       }
     });
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (pointer.button === 0) {
         const release = this.grab.release();
-        if (release) this.cameras.main.shake(60, 0.003);
+        if (release) {
+          const throwSpeed = Phaser.Math.Distance.Between(0, 0, release.vx, release.vy);
+          this.cameras.main.shake(60, 0.003);
+          if (throwSpeed > 540) {
+            this.addScoreAt(5, release.target.x, release.target.y - 34, 'jet violent');
+          }
+        }
       }
     });
 
@@ -158,10 +176,12 @@ export class GameScene extends Phaser.Scene {
 
   private updateHud(): void {
     const r = this.state.resources;
+    const comboText = r.combo > 0 ? `   Combo: x${r.combo}` : '';
     this.hud.setText([
       'GOETIA v2 / Mortis Prototype',
-      'Clic gauche : attraper / jeter   |   Clic droit ou E : extirper âme',
-      '1 : porteur Bifrons (1 âme + 1 corps)   |   2 : archer Leraje (2 âmes + 1 corps)',
+      'Clic gauche : attraper / jeter   |   Shift+clic : priorité cadavre',
+      'Clic droit ou E : extirper âme   |   1 : Bifrons   |   2 : Leraje',
+      `Score: ${r.score}${comboText}   Meilleur combo: x${r.maxCombo}`,
       `Âmes: ${r.souls}   Corps: ${r.bodies}   Traités: ${r.processed}   Purifiés: ${r.purified}   Stabilité: ${r.stability}`,
       `Fosse HP: ${this.pit?.hp ?? 0}   Porteurs: ${this.haulers.filter((h) => h.active).length}   Archers: ${this.archers.filter((a) => a.active).length}`
     ]);
@@ -203,7 +223,7 @@ export class GameScene extends Phaser.Scene {
       if (deposited) {
         this.state.resources.bodies += 1;
         this.state.resources.processed += 1;
-        this.flashText('+1 corps stocké', this.pit.x, this.pit.y - 90);
+        this.addScoreAt(15, this.pit.x, this.pit.y - 90, '+1 corps stocké');
       }
       if (hauler.y > WORLD.groundY - 18) {
         hauler.setY(WORLD.groundY - 18);
@@ -249,6 +269,7 @@ export class GameScene extends Phaser.Scene {
         if (!building.active) continue;
         if (Phaser.Geom.Rectangle.Contains(building.bounds, unit.x, unit.y)) {
           building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
+          this.addScoreAt(20, building.x, building.y - building.bounds.height / 2, 'impact bâtiment');
           this.killLiving(unit, speed / 60);
           this.cameras.main.shake(90, 0.006);
           break;
@@ -282,7 +303,20 @@ export class GameScene extends Phaser.Scene {
     if (!corpse) return;
     this.state.resources.souls += corpse.bodyType === 'guard' ? 2 : 1;
     this.hand.pulseExtraction();
-    this.flashText(corpse.bodyType === 'guard' ? '+2 âmes' : '+1 âme', corpse.x, corpse.y - 42, '#9ddf7c');
+    this.addScoreAt(corpse.bodyType === 'guard' ? 20 : 10, corpse.x, corpse.y - 42, corpse.bodyType === 'guard' ? '+2 âmes' : '+1 âme');
+  }
+
+  private togglePriorityAt(x: number, y: number): void {
+    const candidates = this.corpses
+      .filter((corpse) => corpse.active && corpse.soulExtracted && !corpse.carried)
+      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.x, a.y) - Phaser.Math.Distance.Between(x, y, b.x, b.y));
+    const corpse = candidates[0];
+    if (!corpse || Phaser.Math.Distance.Between(x, y, corpse.x, corpse.y) > 56) {
+      this.flashCenter('Aucun cadavre extrait à prioriser');
+      return;
+    }
+    corpse.setPriority(!corpse.priority);
+    this.flashText(corpse.priority ? 'priorité' : 'priorité retirée', corpse.x, corpse.y - 32, '#f0c96a');
   }
 
   private tryCraftHauler(): void {
@@ -291,6 +325,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.spawnHauler(this.pit.x - 52, WORLD.groundY - 18);
+    this.addScoreAt(25, this.pit.x - 52, WORLD.groundY - 70, 'Sceau de Bifrons');
     this.flashCenter('Sceau de Bifrons : porteur contraint');
   }
 
@@ -301,6 +336,7 @@ export class GameScene extends Phaser.Scene {
     }
     const archer = new Archer(this, this.pit.x - 112 - this.archers.length * 16, WORLD.groundY - 20);
     this.archers.push(archer);
+    this.addScoreAt(35, archer.x, archer.y - 42, 'Sceau de Leraje');
     this.flashCenter('Sceau de Leraje : archer lié');
   }
 
@@ -322,7 +358,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnCorpse(unit.x, unit.y, bodyType);
     unit.destroy();
     this.living = this.living.filter((other) => other !== unit);
-    this.flashText('mort', unit.x, unit.y - 28, '#d57a66');
+    this.addScoreAt(unit.kind === 'guard' ? 25 : 10, unit.x, unit.y - 28, 'mort');
     if (impulse > 7) this.cameras.main.shake(70, 0.004);
   }
 
@@ -356,8 +392,13 @@ export class GameScene extends Phaser.Scene {
 
   private endGame(status: 'victory' | 'defeat', message: string): void {
     this.state.status = status;
-    this.centerText.setText(`${message}\nR pour recommencer`);
+    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nR pour recommencer`);
     this.centerText.setColor(status === 'victory' ? '#9ddf7c' : '#d57a66');
+  }
+
+  private addScoreAt(base: number, x: number, y: number, label: string): void {
+    const gained = this.state.addScore(base, this.time.now);
+    this.flashText(`${label}  +${gained}`, x, y, '#f0c96a');
   }
 
   private flashText(text: string, x: number, y: number, color = '#efe9d4'): void {
