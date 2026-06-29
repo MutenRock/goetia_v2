@@ -31,6 +31,10 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Patch asset paths for Nitro subdirectory
+        run: |
+          sed -i 's|/assets/|./assets/|g' dist/index.html
+
       - name: Add deployment marker
         run: |
           echo "GOETIA v2 deploy" > dist/deploy-test.txt
