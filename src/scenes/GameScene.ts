@@ -38,6 +38,8 @@ export class GameScene extends Phaser.Scene {
   private shiftKey?: Phaser.Input.Keyboard.Key;
   private isPaused = false;
   private helpVisible = false;
+  private houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs;
+  private barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs;
 
   constructor() {
     super('GameScene');
@@ -63,6 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.grab.updatePointer(pointer.x, pointer.y);
     this.soulExtraction.update(deltaMs);
 
+    this.updateBuildings(time, deltaMs);
     this.updateLiving(deltaMs);
     this.updateCorpses(deltaSeconds);
     this.updateHaulers(deltaMs);
@@ -81,6 +84,8 @@ export class GameScene extends Phaser.Scene {
     this.state = new GameState();
     this.isPaused = false;
     this.helpVisible = false;
+    this.houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs * 0.65;
+    this.barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs * 0.8;
     this.living = [];
     this.corpses = [];
     this.buildings = [];
@@ -231,8 +236,11 @@ export class GameScene extends Phaser.Scene {
       '1 : creer un porteur de Bifrons avec 1 ame + 1 corps.',
       '2 : creer un archer de Leraje avec 2 ames + 1 corps.',
       '',
+      'Les maisons font revenir des villageois.',
+      'La caserne appelle des gardes.',
+      'La chapelle purifie les cadavres dans son aura blanche.',
+      '',
       'Objectif : detruire/profaner la chapelle et nourrir la fosse.',
-      'Attention : la chapelle purifie les cadavres trop proches.',
       '',
       'H : fermer cette aide'
     ], '#9ddf7c');
@@ -241,8 +249,8 @@ export class GameScene extends Phaser.Scene {
 
   private createModal(lines: string[], accent: string): Phaser.GameObjects.Container {
     const panel = this.add.container(WORLD.width / 2, WORLD.height / 2).setDepth(DEPTH.ui + 20);
-    const bg = this.add.rectangle(0, 0, 760, 390, 0x100916, 0.94).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(accent).color, 0.9);
-    const text = this.add.text(-340, -170, lines.join('\n'), {
+    const bg = this.add.rectangle(0, 0, 760, 420, 0x100916, 0.94).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(accent).color, 0.9);
+    const text = this.add.text(-340, -190, lines.join('\n'), {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#efe9d4',
@@ -272,6 +280,8 @@ export class GameScene extends Phaser.Scene {
     const chapelAlive = this.buildings.some((building) => building.kind === 'chapel' && building.active);
     const barracksAlive = this.buildings.some((building) => building.kind === 'barracks' && building.active);
     const processedOk = this.state.resources.processed >= LEVELS[0].victoryProcessedBodies;
+    const peasants = this.living.filter((unit) => unit.active && unit.kind === 'peasant').length;
+    const guards = this.living.filter((unit) => unit.active && unit.kind === 'guard').length;
     return [
       'OBJECTIF',
       `${chapelAlive ? '[ ]' : '[x]'} Profaner la chapelle`,
@@ -279,8 +289,46 @@ export class GameScene extends Phaser.Scene {
       `${barracksAlive ? '[ ]' : '[x]'} Briser la caserne`,
       `${this.pit.hp > 0 ? '[x]' : '[ ]'} Protéger la fosse`,
       '',
-      'Perte : 12 corps purifiés'
+      `Villageois: ${peasants}/${BALANCE.buildings.maxPeasants}`,
+      `Gardes: ${guards}/${BALANCE.buildings.maxGuards}`,
+      `Purifiés: ${this.state.resources.purified}/12`
     ].join('\n');
+  }
+
+  private updateBuildings(timeMs: number, deltaMs: number): void {
+    for (const building of this.buildings) {
+      building.updateBuilding(timeMs);
+    }
+    this.updateBuildingSpawns(deltaMs);
+  }
+
+  private updateBuildingSpawns(deltaMs: number): void {
+    const houses = this.buildings.filter((building) => building.kind === 'house' && building.active);
+    const barracks = this.buildings.filter((building) => building.kind === 'barracks' && building.active);
+    const peasantCount = this.living.filter((unit) => unit.active && unit.kind === 'peasant').length;
+    const guardCount = this.living.filter((unit) => unit.active && unit.kind === 'guard').length;
+
+    if (houses.length > 0 && peasantCount < BALANCE.buildings.maxPeasants) {
+      this.houseSpawnTimerMs -= deltaMs;
+      if (this.houseSpawnTimerMs <= 0) {
+        const house = Phaser.Math.RND.pick(houses);
+        const point = house.getSpawnPoint();
+        this.spawnLiving('peasant', point.x, point.y);
+        this.flashText('sort de maison', point.x, point.y - 42, '#efe9d4');
+        this.houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs + Phaser.Math.Between(-900, 900);
+      }
+    }
+
+    if (barracks.length > 0 && guardCount < BALANCE.buildings.maxGuards) {
+      this.barracksSpawnTimerMs -= deltaMs;
+      if (this.barracksSpawnTimerMs <= 0) {
+        const source = Phaser.Math.RND.pick(barracks);
+        const point = source.getSpawnPoint();
+        this.spawnLiving('guard', point.x, point.y);
+        this.flashText('renfort', point.x, point.y - 42, '#d7d0b0');
+        this.barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs + Phaser.Math.Between(-1200, 1200);
+      }
+    }
   }
 
   private updateLiving(deltaMs: number): void {
@@ -364,8 +412,12 @@ export class GameScene extends Phaser.Scene {
       for (const building of this.buildings) {
         if (!building.active) continue;
         if (Phaser.Geom.Rectangle.Contains(building.bounds, unit.x, unit.y)) {
-          building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
+          const collapsed = building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
           this.addScoreAt(20, building.x, building.y - building.bounds.height / 2, 'impact bâtiment');
+          if (collapsed) {
+            this.addScoreAt(BALANCE.buildings.collapseScore[building.kind], building.x, building.y - building.bounds.height / 2 - 26, `${building.kind} détruit`);
+            this.cameras.main.shake(180, 0.009);
+          }
           this.killLiving(unit, speed / 60);
           this.cameras.main.shake(90, 0.006);
           break;
