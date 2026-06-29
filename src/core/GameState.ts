@@ -5,7 +5,7 @@ export class GameState {
   public resources: Resources = {
     souls: BALANCE.pit.startSouls,
     bodies: BALANCE.pit.startBodies,
-    stability: 100,
+    stability: BALANCE.stability.start,
     purified: 0,
     processed: 0,
     score: 0,
@@ -26,6 +26,23 @@ export class GameState {
     this.resources.souls -= cost.souls;
     this.resources.bodies -= cost.bodies;
     return true;
+  }
+
+  canSpendStability(amount: number): boolean {
+    return this.resources.stability - amount >= BALANCE.stability.min;
+  }
+
+  spendStability(amount: number): boolean {
+    if (!this.canSpendStability(amount)) return false;
+    this.adjustStability(-amount);
+    return true;
+  }
+
+  adjustStability(delta: number): number {
+    this.resources.stability = Math.round(
+      Math.max(BALANCE.stability.min, Math.min(BALANCE.stability.max, this.resources.stability + delta))
+    );
+    return this.resources.stability;
   }
 
   tick(timeMs: number): void {
