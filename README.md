@@ -12,7 +12,12 @@ Le but n'est pas de copier un jeu existant : GOETIA garde son twist central, la 
 
 Cette v0.2 contient déjà :
 
+- un menu principal avec pitch, objectif et lancement rapide ;
 - une scène 2D latérale 960x540 ;
+- une aide en jeu consultable avec `H` ;
+- une pause avec `P` ou `Echap` ;
+- un retour menu avec `M` ;
+- un panneau d'objectif dynamique ;
 - une main contrôlée à la souris, avec ombre et feedback de saisie ;
 - grab / throw sur villageois et cadavres ;
 - dégâts d'impact contre le sol et les bâtiments ;
@@ -30,6 +35,7 @@ Cette v0.2 contient déjà :
 
 | Action | Contrôle |
 |---|---|
+| Commencer depuis le menu | `Entrée`, `Espace` ou clic |
 | Déplacer la main | Souris |
 | Attraper | Clic gauche maintenu |
 | Jeter | Relâcher clic gauche avec mouvement |
@@ -37,6 +43,9 @@ Cette v0.2 contient déjà :
 | Marquer un cadavre extrait comme prioritaire | `Shift` + clic gauche |
 | Créer un porteur de Bifrons | `1` |
 | Créer un archer de Leraje | `2` |
+| Aide en jeu | `H` |
+| Pause / reprise | `P` ou `Echap` |
+| Retour menu | `M` |
 | Restart | `R` |
 
 ## Installation locale
@@ -85,7 +94,7 @@ goetia_v2/
 │  ├─ core/                # state, types, balance
 │  ├─ data/                # demons, levels
 │  ├─ entities/            # hand, units, corpse, pit, buildings
-│  ├─ scenes/              # BootScene, GameScene
+│  ├─ scenes/              # BootScene, MenuScene, GameScene
 │  ├─ systems/             # grab, extraction, combat
 │  └─ ui/                  # futur HUD avancé
 └─ .github/workflows/      # build CI
