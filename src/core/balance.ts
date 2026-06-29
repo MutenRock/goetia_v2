@@ -48,6 +48,19 @@ export const BALANCE = {
       barn: 90
     }
   },
+  stability: {
+    start: 100,
+    min: 0,
+    max: 100,
+    extractCost: 1,
+    haulerCost: 4,
+    archerCost: 7,
+    purifiedDamage: 6,
+    bodyProcessedGain: 2,
+    buildingCollapseGain: 8,
+    lowThreshold: 35,
+    criticalThreshold: 15
+  },
   pit: {
     hp: 260,
     startSouls: 0,
