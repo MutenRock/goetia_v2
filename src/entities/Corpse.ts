@@ -5,7 +5,7 @@ import type { BodyType } from '../core/types';
 
 export class Corpse extends Phaser.Physics.Arcade.Sprite {
   public readonly bodyType: BodyType;
-  public freshness = BALANCE.corpse.freshnessMax;
+  public freshness: number = BALANCE.corpse.freshnessMax;
   public soulExtracted = false;
   public claimed = false;
   public carried = false;
