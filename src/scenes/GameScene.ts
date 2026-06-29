@@ -38,8 +38,8 @@ export class GameScene extends Phaser.Scene {
   private shiftKey?: Phaser.Input.Keyboard.Key;
   private isPaused = false;
   private helpVisible = false;
-  private houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs;
-  private barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs;
+  private houseSpawnTimerMs: number = BALANCE.buildings.houseSpawnCooldownMs;
+  private barracksSpawnTimerMs: number = BALANCE.buildings.barracksSpawnCooldownMs;
 
   constructor() {
     super('GameScene');
