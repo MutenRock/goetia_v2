@@ -1,0 +1,23 @@
+{
+  "name": "goetia-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GOETIA / Mortis — prototype web arcade de nécromancie logistique, inspiré du feeling Flash à la Pillage the Village.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^3.86.0"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
