@@ -36,6 +36,31 @@ export const BALANCE = {
     attackDamage: 6,
     attackCooldownMs: 900
   },
+  buildings: {
+    houseSpawnCooldownMs: 5200,
+    barracksSpawnCooldownMs: 7600,
+    maxPeasants: 18,
+    maxGuards: 6,
+    collapseScore: {
+      house: 60,
+      chapel: 260,
+      barracks: 180,
+      barn: 90
+    }
+  },
+  stability: {
+    start: 100,
+    min: 0,
+    max: 100,
+    extractCost: 1,
+    haulerCost: 4,
+    archerCost: 7,
+    purifiedDamage: 6,
+    bodyProcessedGain: 2,
+    buildingCollapseGain: 8,
+    lowThreshold: 35,
+    criticalThreshold: 15
+  },
   pit: {
     hp: 260,
     startSouls: 0,

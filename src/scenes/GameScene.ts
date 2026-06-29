@@ -38,6 +38,8 @@ export class GameScene extends Phaser.Scene {
   private shiftKey?: Phaser.Input.Keyboard.Key;
   private isPaused = false;
   private helpVisible = false;
+  private houseSpawnTimerMs: number = BALANCE.buildings.houseSpawnCooldownMs;
+  private barracksSpawnTimerMs: number = BALANCE.buildings.barracksSpawnCooldownMs;
 
   constructor() {
     super('GameScene');
@@ -63,6 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.grab.updatePointer(pointer.x, pointer.y);
     this.soulExtraction.update(deltaMs);
 
+    this.updateBuildings(time, deltaMs);
     this.updateLiving(deltaMs);
     this.updateCorpses(deltaSeconds);
     this.updateHaulers(deltaMs);
@@ -81,6 +84,8 @@ export class GameScene extends Phaser.Scene {
     this.state = new GameState();
     this.isPaused = false;
     this.helpVisible = false;
+    this.houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs * 0.65;
+    this.barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs * 0.8;
     this.living = [];
     this.corpses = [];
     this.buildings = [];
@@ -228,11 +233,17 @@ export class GameScene extends Phaser.Scene {
       'Relacher avec elan : jeter. Les impacts forts tuent et abiment les batiments.',
       'Clic droit / E : extirper l ame d un cadavre lumineux.',
       'Shift + clic : prioriser un cadavre extrait pour les porteurs.',
-      '1 : creer un porteur de Bifrons avec 1 ame + 1 corps.',
-      '2 : creer un archer de Leraje avec 2 ames + 1 corps.',
+      '1 : creer un porteur de Bifrons avec 1 ame + 1 corps + stabilite.',
+      '2 : creer un archer de Leraje avec 2 ames + 1 corps + stabilite.',
+      '',
+      'Les maisons font revenir des villageois.',
+      'La caserne appelle des gardes.',
+      'La chapelle purifie les cadavres dans son aura blanche.',
+      '',
+      'La stabilite baisse avec les rituels et les purifications.',
+      'Les corps traites et les batiments profanes stabilisent la fosse.',
       '',
       'Objectif : detruire/profaner la chapelle et nourrir la fosse.',
-      'Attention : la chapelle purifie les cadavres trop proches.',
       '',
       'H : fermer cette aide'
     ], '#9ddf7c');
@@ -241,8 +252,8 @@ export class GameScene extends Phaser.Scene {
 
   private createModal(lines: string[], accent: string): Phaser.GameObjects.Container {
     const panel = this.add.container(WORLD.width / 2, WORLD.height / 2).setDepth(DEPTH.ui + 20);
-    const bg = this.add.rectangle(0, 0, 760, 390, 0x100916, 0.94).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(accent).color, 0.9);
-    const text = this.add.text(-340, -170, lines.join('\n'), {
+    const bg = this.add.rectangle(0, 0, 760, 450, 0x100916, 0.94).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(accent).color, 0.9);
+    const text = this.add.text(-340, -205, lines.join('\n'), {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#efe9d4',
@@ -261,8 +272,9 @@ export class GameScene extends Phaser.Scene {
       'Clic gauche : attraper/jeter   Shift+clic : priorité cadavre',
       'Clic droit ou E : extirper âme   |   1 : Bifrons   |   2 : Leraje',
       `Score: ${r.score}${comboText}   Meilleur combo: x${r.maxCombo}`,
-      `Âmes: ${r.souls}   Corps: ${r.bodies}   Traités: ${r.processed}   Purifiés: ${r.purified}   Stabilité: ${r.stability}`,
-      `Fosse HP: ${this.pit?.hp ?? 0}   Porteurs: ${this.haulers.filter((h) => h.active).length}   Archers: ${this.archers.filter((a) => a.active).length}`
+      `Âmes: ${r.souls}   Corps: ${r.bodies}   Traités: ${r.processed}   Purifiés: ${r.purified}`,
+      `Stabilité: ${r.stability}/${BALANCE.stability.max} (${this.getStabilityLabel()})   Fosse HP: ${this.pit?.hp ?? 0}`,
+      `Porteurs: ${this.haulers.filter((h) => h.active).length}   Archers: ${this.archers.filter((a) => a.active).length}`
     ]);
 
     this.objectiveText.setText(this.getObjectiveText());
@@ -272,15 +284,56 @@ export class GameScene extends Phaser.Scene {
     const chapelAlive = this.buildings.some((building) => building.kind === 'chapel' && building.active);
     const barracksAlive = this.buildings.some((building) => building.kind === 'barracks' && building.active);
     const processedOk = this.state.resources.processed >= LEVELS[0].victoryProcessedBodies;
+    const peasants = this.living.filter((unit) => unit.active && unit.kind === 'peasant').length;
+    const guards = this.living.filter((unit) => unit.active && unit.kind === 'guard').length;
     return [
       'OBJECTIF',
       `${chapelAlive ? '[ ]' : '[x]'} Profaner la chapelle`,
       `${processedOk ? '[x]' : '[ ]'} Nourrir la fosse ${this.state.resources.processed}/${LEVELS[0].victoryProcessedBodies}`,
       `${barracksAlive ? '[ ]' : '[x]'} Briser la caserne`,
       `${this.pit.hp > 0 ? '[x]' : '[ ]'} Protéger la fosse`,
+      `${this.state.resources.stability > 0 ? '[x]' : '[ ]'} Garder les sceaux stables`,
       '',
-      'Perte : 12 corps purifiés'
+      `Villageois: ${peasants}/${BALANCE.buildings.maxPeasants}`,
+      `Gardes: ${guards}/${BALANCE.buildings.maxGuards}`,
+      `Purifiés: ${this.state.resources.purified}/12`
     ].join('\n');
+  }
+
+  private updateBuildings(timeMs: number, deltaMs: number): void {
+    for (const building of this.buildings) {
+      building.updateBuilding(timeMs);
+    }
+    this.updateBuildingSpawns(deltaMs);
+  }
+
+  private updateBuildingSpawns(deltaMs: number): void {
+    const houses = this.buildings.filter((building) => building.kind === 'house' && building.active);
+    const barracks = this.buildings.filter((building) => building.kind === 'barracks' && building.active);
+    const peasantCount = this.living.filter((unit) => unit.active && unit.kind === 'peasant').length;
+    const guardCount = this.living.filter((unit) => unit.active && unit.kind === 'guard').length;
+
+    if (houses.length > 0 && peasantCount < BALANCE.buildings.maxPeasants) {
+      this.houseSpawnTimerMs -= deltaMs;
+      if (this.houseSpawnTimerMs <= 0) {
+        const house = Phaser.Math.RND.pick(houses);
+        const point = house.getSpawnPoint();
+        this.spawnLiving('peasant', point.x, point.y);
+        this.flashText('sort de maison', point.x, point.y - 42, '#efe9d4');
+        this.houseSpawnTimerMs = BALANCE.buildings.houseSpawnCooldownMs + Phaser.Math.Between(-900, 900);
+      }
+    }
+
+    if (barracks.length > 0 && guardCount < BALANCE.buildings.maxGuards) {
+      this.barracksSpawnTimerMs -= deltaMs;
+      if (this.barracksSpawnTimerMs <= 0) {
+        const source = Phaser.Math.RND.pick(barracks);
+        const point = source.getSpawnPoint();
+        this.spawnLiving('guard', point.x, point.y);
+        this.flashText('renfort', point.x, point.y - 42, '#d7d0b0');
+        this.barracksSpawnTimerMs = BALANCE.buildings.barracksSpawnCooldownMs + Phaser.Math.Between(-1200, 1200);
+      }
+    }
   }
 
   private updateLiving(deltaMs: number): void {
@@ -319,7 +372,9 @@ export class GameScene extends Phaser.Scene {
       if (deposited) {
         this.state.resources.bodies += 1;
         this.state.resources.processed += 1;
+        this.state.adjustStability(BALANCE.stability.bodyProcessedGain);
         this.addScoreAt(15, this.pit.x, this.pit.y - 90, '+1 corps stocké');
+        this.flashText(`+${BALANCE.stability.bodyProcessedGain} stabilité`, this.pit.x, this.pit.y - 116, '#9ddf7c');
       }
       if (hauler.y > WORLD.groundY - 18) {
         hauler.setY(WORLD.groundY - 18);
@@ -348,7 +403,9 @@ export class GameScene extends Phaser.Scene {
           const purified = corpse.purify(deltaSeconds);
           if (purified) {
             this.state.resources.purified += 1;
-            this.flashText('purifié', corpse.x, corpse.y - 24, '#ffffff');
+            this.state.adjustStability(-BALANCE.stability.purifiedDamage);
+            this.flashText(`purifié  -${BALANCE.stability.purifiedDamage} stabilité`, corpse.x, corpse.y - 24, '#ffffff');
+            this.warnLowStability(corpse.x, corpse.y - 54);
             this.removeCorpse(corpse);
           }
         }
@@ -364,8 +421,14 @@ export class GameScene extends Phaser.Scene {
       for (const building of this.buildings) {
         if (!building.active) continue;
         if (Phaser.Geom.Rectangle.Contains(building.bounds, unit.x, unit.y)) {
-          building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
+          const collapsed = building.damage(speed * BALANCE.living.impactBuildingDamageFactor);
           this.addScoreAt(20, building.x, building.y - building.bounds.height / 2, 'impact bâtiment');
+          if (collapsed) {
+            this.state.adjustStability(BALANCE.stability.buildingCollapseGain);
+            this.addScoreAt(BALANCE.buildings.collapseScore[building.kind], building.x, building.y - building.bounds.height / 2 - 26, `${building.kind} détruit`);
+            this.flashText(`+${BALANCE.stability.buildingCollapseGain} stabilité`, building.x, building.y - building.bounds.height / 2 - 52, '#9ddf7c');
+            this.cameras.main.shake(180, 0.009);
+          }
           this.killLiving(unit, speed / 60);
           this.cameras.main.shake(90, 0.006);
           break;
@@ -398,8 +461,10 @@ export class GameScene extends Phaser.Scene {
     const corpse = this.soulExtraction.tryExtract(this, x, y, this.corpses);
     if (!corpse) return;
     this.state.resources.souls += corpse.bodyType === 'guard' ? 2 : 1;
+    this.state.adjustStability(-BALANCE.stability.extractCost);
     this.hand.pulseExtraction();
     this.addScoreAt(corpse.bodyType === 'guard' ? 20 : 10, corpse.x, corpse.y - 42, corpse.bodyType === 'guard' ? '+2 âmes' : '+1 âme');
+    this.warnLowStability(corpse.x, corpse.y - 72);
   }
 
   private togglePriorityAt(x: number, y: number): void {
@@ -434,24 +499,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryCraftHauler(): void {
-    if (!this.state.pay(BALANCE.pit.haulerCost)) {
+    if (!this.state.canPay(BALANCE.pit.haulerCost)) {
       this.flashCenter('Pas assez de ressources pour Bifrons');
       return;
     }
+    if (!this.state.canSpendStability(BALANCE.stability.haulerCost)) {
+      this.flashCenter('Sceaux trop instables pour Bifrons');
+      return;
+    }
+    this.state.pay(BALANCE.pit.haulerCost);
+    this.state.spendStability(BALANCE.stability.haulerCost);
     this.spawnHauler(this.pit.x - 52, WORLD.groundY - 18);
     this.addScoreAt(25, this.pit.x - 52, WORLD.groundY - 70, 'Sceau de Bifrons');
-    this.flashCenter('Sceau de Bifrons : porteur contraint');
+    this.flashCenter(`Sceau de Bifrons : -${BALANCE.stability.haulerCost} stabilité`);
+    this.warnLowStability(this.pit.x - 52, WORLD.groundY - 96);
   }
 
   private tryCraftArcher(): void {
-    if (!this.state.pay(BALANCE.pit.archerCost)) {
+    if (!this.state.canPay(BALANCE.pit.archerCost)) {
       this.flashCenter('Pas assez de ressources pour Leraje');
       return;
     }
+    if (!this.state.canSpendStability(BALANCE.stability.archerCost)) {
+      this.flashCenter('Sceaux trop instables pour Leraje');
+      return;
+    }
+    this.state.pay(BALANCE.pit.archerCost);
+    this.state.spendStability(BALANCE.stability.archerCost);
     const archer = new Archer(this, this.pit.x - 112 - this.archers.length * 16, WORLD.groundY - 20);
     this.archers.push(archer);
     this.addScoreAt(35, archer.x, archer.y - 42, 'Sceau de Leraje');
-    this.flashCenter('Sceau de Leraje : archer lié');
+    this.flashCenter(`Sceau de Leraje : -${BALANCE.stability.archerCost} stabilité`);
+    this.warnLowStability(archer.x, archer.y - 72);
   }
 
   private spawnLiving(kind: 'peasant' | 'guard', x: number, y: number): LivingUnit {
@@ -491,6 +570,10 @@ export class GameScene extends Phaser.Scene {
     if (this.state.status !== 'playing') return;
     const chapelAlive = this.buildings.some((building) => building.kind === 'chapel' && building.active);
     const barracksAlive = this.buildings.some((building) => building.kind === 'barracks' && building.active);
+    if (this.state.resources.stability <= BALANCE.stability.min) {
+      this.endGame('defeat', 'Les sceaux sont instables. La fosse se referme.');
+      return;
+    }
     if (this.state.resources.processed >= LEVELS[0].victoryProcessedBodies && !chapelAlive) {
       this.endGame('victory', 'Victoire : la chapelle est profanée et la fosse est nourrie.');
       return;
@@ -508,13 +591,29 @@ export class GameScene extends Phaser.Scene {
     this.state.status = status;
     this.pauseOverlay?.setVisible(false);
     this.helpOverlay?.setVisible(false);
-    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nR pour recommencer   |   M pour menu`);
+    this.centerText.setText(`${message}\nScore final : ${this.state.resources.score}\nStabilité finale : ${this.state.resources.stability}\nR pour recommencer   |   M pour menu`);
     this.centerText.setColor(status === 'victory' ? '#9ddf7c' : '#d57a66');
   }
 
   private addScoreAt(base: number, x: number, y: number, label: string): void {
     const gained = this.state.addScore(base, this.time.now);
     this.flashText(`${label}  +${gained}`, x, y, '#f0c96a');
+  }
+
+  private getStabilityLabel(): string {
+    const stability = this.state.resources.stability;
+    if (stability <= BALANCE.stability.criticalThreshold) return 'CRITIQUE';
+    if (stability <= BALANCE.stability.lowThreshold) return 'INSTABLE';
+    return 'stable';
+  }
+
+  private warnLowStability(x: number, y: number): void {
+    const stability = this.state.resources.stability;
+    if (stability <= BALANCE.stability.criticalThreshold) {
+      this.flashText('sceaux critiques', x, y, '#d57a66');
+    } else if (stability <= BALANCE.stability.lowThreshold) {
+      this.flashText('sceaux instables', x, y, '#f0c96a');
+    }
   }
 
   private flashText(text: string, x: number, y: number, color = '#efe9d4'): void {

@@ -10,7 +10,7 @@ Le but n'est pas de copier un jeu existant : GOETIA garde son twist central, la 
 
 ## État du prototype
 
-Cette v0.2 contient déjà :
+Cette v0.3 contient déjà :
 
 - un menu principal avec pitch, objectif et lancement rapide ;
 - une scène 2D latérale 960x540 ;
@@ -26,8 +26,13 @@ Cette v0.2 contient déjà :
 - porteurs de Bifrons qui récupèrent les cadavres extraits et respectent les priorités ;
 - fosse qui stocke les corps ;
 - archers de Leraje produits depuis la fosse ;
-- gardes qui attaquent la fosse et les porteurs ;
-- chapelle qui purifie les cadavres ;
+- maisons qui font revenir des villageois tant qu'elles tiennent ;
+- caserne qui appelle des gardes tant qu'elle tient ;
+- chapelle avec aura visible qui purifie les cadavres proches ;
+- stabilité rituelle active : extractions, invocations et purifications déstabilisent les sceaux ;
+- corps traités et bâtiments profanés rendent de la stabilité ;
+- défaite si la stabilité tombe à zéro ;
+- scoring arcade sur impacts, extractions, corps stockés, invocations et bâtiments détruits ;
 - score arcade, combo temporaire et score final ;
 - conditions simples de victoire/défaite.
 
@@ -47,6 +52,17 @@ Cette v0.2 contient déjà :
 | Pause / reprise | `P` ou `Echap` |
 | Retour menu | `M` |
 | Restart | `R` |
+
+## Logique de stabilité
+
+La stabilité représente l'intégrité des sceaux autour de la fosse.
+
+- Extirper une âme coûte un peu de stabilité.
+- Créer un porteur de Bifrons ou un archer de Leraje coûte de la stabilité.
+- Un cadavre purifié par la chapelle fait beaucoup baisser la stabilité.
+- Chaque corps ramené à la fosse restaure un peu la stabilité.
+- Détruire/profaner un bâtiment restaure de la stabilité.
+- Si la stabilité tombe à zéro, la partie est perdue.
 
 ## Installation locale
 
