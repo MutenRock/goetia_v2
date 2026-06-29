@@ -10,19 +10,20 @@ Le but n'est pas de copier un jeu existant : GOETIA garde son twist central, la 
 
 ## État du prototype
 
-Cette v0.1 contient déjà :
+Cette v0.2 contient déjà :
 
 - une scène 2D latérale 960x540 ;
-- une main contrôlée à la souris ;
+- une main contrôlée à la souris, avec ombre et feedback de saisie ;
 - grab / throw sur villageois et cadavres ;
 - dégâts d'impact contre le sol et les bâtiments ;
-- cadavres persistants ;
+- cadavres persistants avec états visuels : âme présente, âme extraite, priorité, purification ;
 - extraction d'âme au clic droit ou avec `E` ;
-- porteurs de Bifrons qui récupèrent les cadavres extraits ;
+- porteurs de Bifrons qui récupèrent les cadavres extraits et respectent les priorités ;
 - fosse qui stocke les corps ;
 - archers de Leraje produits depuis la fosse ;
 - gardes qui attaquent la fosse et les porteurs ;
 - chapelle qui purifie les cadavres ;
+- score arcade, combo temporaire et score final ;
 - conditions simples de victoire/défaite.
 
 ## Contrôles
@@ -33,6 +34,7 @@ Cette v0.1 contient déjà :
 | Attraper | Clic gauche maintenu |
 | Jeter | Relâcher clic gauche avec mouvement |
 | Extraire l'âme | Clic droit sur cadavre ou `E` |
+| Marquer un cadavre extrait comme prioritaire | `Shift` + clic gauche |
 | Créer un porteur de Bifrons | `1` |
 | Créer un archer de Leraje | `2` |
 | Restart | `R` |
@@ -93,6 +95,6 @@ goetia_v2/
 
 Avant d'ajouter du lore ou des assets, tester uniquement ceci :
 
-> Est-ce que la boucle `attraper → tuer → extirper âme → porteur ramène corps → fosse produit` est fun pendant 5 minutes ?
+> Est-ce que la boucle `attraper → tuer → extirper âme → prioriser un corps → porteur ramène corps → fosse produit` est fun pendant 5 minutes ?
 
 Si oui, on peut ajouter les upgrades, les autres sceaux, les sons et une vraie direction artistique.
