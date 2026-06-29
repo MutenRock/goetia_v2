@@ -47,6 +47,7 @@ export class Hauler extends Phaser.Physics.Arcade.Sprite {
       if (Phaser.Math.Distance.Between(this.x, this.y, this.targetCorpse.x, this.targetCorpse.y) < 24) {
         this.carriedCorpse = this.targetCorpse;
         this.carriedCorpse.carried = true;
+        this.carriedCorpse.setPriority(false);
         this.carriedCorpse.disableBody(true, false);
         this.targetCorpse = null;
         this.mode = 'toPit';
@@ -78,7 +79,10 @@ export class Hauler extends Phaser.Physics.Arcade.Sprite {
 
   private findTarget(corpses: Corpse[]): Corpse | null {
     const available = corpses.filter((corpse) => corpse.active && !corpse.claimed && !corpse.carried && corpse.soulExtracted);
-    available.sort((a, b) => Phaser.Math.Distance.Between(this.x, this.y, a.x, a.y) - Phaser.Math.Distance.Between(this.x, this.y, b.x, b.y));
+    available.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority ? -1 : 1;
+      return Phaser.Math.Distance.Between(this.x, this.y, a.x, a.y) - Phaser.Math.Distance.Between(this.x, this.y, b.x, b.y);
+    });
     return available[0] ?? null;
   }
 
